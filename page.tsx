@@ -1,102 +1,148 @@
 "use client";
 
 import Link from "next/link";
-import { En, Icon, InfinityMark, Wordmark } from "@/components/ui";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { Avatar, Button, En, Icon, Wordmark } from "@/components/ui";
 import { ORG } from "@/lib/data";
 import { useLang } from "@/lib/i18n";
-import { EDITION } from "@/lib/edition";
+import { useStore } from "@/lib/store";
+import { DISCIPLINE_LABEL } from "@/lib/types";
 
 /**
- * The gate.
+ * Identity, not authentication.
  *
- * The right place to state the governance position before anyone sees a
- * patient name, and to make clear this is a demonstration build.
+ * This screen used to be a mock email and password form, which was the wrong
+ * thing in two ways: it invited people to type credentials into something that
+ * checks nothing, and it left every viewer of the shared board acting as the
+ * same clinician — which makes "only the person who asked may close" a rule
+ * about nobody.
+ *
+ * So it asks the honest question instead. The choice is remembered per device
+ * and drives every permission in the application: who may answer, who may
+ * close, who holds a discipline lead's authority. Real authentication belongs
+ * to the hospital's identity provider and is listed as a prerequisite in the
+ * protocol, not faked here.
  */
-export default function GatePage() {
+export default function LoginPage() {
+  const router = useRouter();
+  const { team, currentUser, signInAs } = useStore();
   const { lang, t } = useLang();
+  const [picked, setPicked] = useState<string>(currentUser.id);
+
+  const chosen = team.find((m) => m.id === picked) ?? currentUser;
+
+  function enter() {
+    signInAs(chosen.id);
+    router.push("/loops");
+  }
 
   return (
     <div className="flex min-h-dvh justify-center bg-[#0a0f16] md:py-6">
-      <div className="flex min-h-dvh w-full max-w-[440px] flex-col justify-between bg-[var(--color-canvas)] px-6 py-10 md:h-[calc(100dvh-3rem)] md:min-h-0 md:overflow-y-auto md:rounded-3xl md:border md:border-[var(--color-line-strong)]">
-        <div className="flex flex-1 flex-col items-center justify-center text-center">
-          <div className="grid size-20 place-items-center rounded-3xl bg-gradient-to-br from-[#137fec] to-[#0d5aa8] shadow-lg shadow-[#137fec44]">
-            <InfinityMark size={46} className="text-white" />
+      <div className="flex min-h-dvh w-full max-w-[440px] flex-col bg-[var(--color-canvas)] px-6 py-8 md:h-[calc(100dvh-3rem)] md:min-h-0 md:overflow-y-auto md:rounded-3xl md:border md:border-[var(--color-line-strong)]">
+        <Link
+          href="/"
+          aria-label={t("Back", "חזרה")}
+          className="-ms-2 grid size-10 place-items-center rounded-full text-white hover:bg-white/5"
+        >
+          <Icon name="arrow_back" size={22} />
+        </Link>
+
+        <div className="flex flex-1 flex-col justify-center">
+          <div className="mb-6 flex flex-col items-center text-center">
+            <div className="mt-2">
+              <Wordmark />
+            </div>
+            <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
+              {t("Head & neck oncology", "אונקולוגיה של ראש-צוואר")}
+            </p>
+            <p className="text-[12px] text-[var(--color-ink-faint)]">{ORG.hospital}</p>
           </div>
-          <div className="mt-5">
-            <Wordmark mark={false} />
-          </div>
-          {/* The name is an abbreviation, so it is expanded once, here, before
-              it is used everywhere else — in this build and in the Hebrew
-              submission materials alike. */}
-          <p className="mt-1.5 text-[15px] text-[var(--color-ink-muted)]">
-            {lang === "he" ? (
-              <>
-                <strong className="font-semibold text-white">הצוות הרב-תחומי לראש-צוואר
-                (<En>MDT</En>)</strong>, בלולאה סגורה
-              </>
-            ) : (
-              <>
-                The head &amp; neck <strong className="font-semibold text-white">multidisciplinary
-                team (MDT)</strong>, in closed loop
-              </>
+
+          <h1 className="mb-1 text-[15px] font-bold text-white">
+            {t("Who is using this device?", "מי משתמש במכשיר הזה?")}
+          </h1>
+          <p className="mb-3 text-[12px] leading-relaxed text-[var(--color-ink-muted)]">
+            {t(
+              "The board is shared with the team. Your choice decides what you may do on it — a loop can only be closed by the clinician who opened it.",
+              "הלוח משותף לכל הצוות. הבחירה שלך קובעת מה מותר לך לעשות בו — לולאה נסגרת רק בידי מי שפתח אותה.",
             )}
           </p>
-          <p className="mt-1 text-[12px] text-[var(--color-ink-faint)]">{ORG.hospital}</p>
 
-          <div className="mt-8 w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5 text-start">
-            <div className="mb-2 flex items-center gap-2">
-              <Icon name="lock" size={20} className="text-[var(--color-primary)]" />
-              <h2 className="text-base font-bold text-white">
-                {t("Restricted access", "גישה מוגבלת")}
-              </h2>
-            </div>
-            <p className="text-[13px] leading-relaxed text-[var(--color-ink-muted)]">
-              {t(
-                "This system holds information about oncology patients. Access is limited to members of the head and neck multidisciplinary team, and every access is logged.",
-                "המערכת מחזיקה מידע על מטופלים אונקולוגיים. הגישה מוגבלת לחברי הצוות הרב-תחומי לראש-צוואר, וכל כניסה נרשמת.",
-              )}
-            </p>
-          </div>
+          <ul className="space-y-2" role="radiogroup" aria-label={t("Choose your identity", "בחירת זהות")}>
+            {team.map((m) => {
+              const active = m.id === picked;
+              return (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setPicked(m.id)}
+                    className={`flex w-full items-center gap-3 rounded-xl border p-3 text-start transition-colors ${
+                      active
+                        ? "border-[var(--color-primary)] bg-[var(--color-primary-soft)]"
+                        : "border-[var(--color-line)] hover:border-[var(--color-line-strong)]"
+                    }`}
+                  >
+                    <Avatar initials={m.initials} colour={m.colour} size={34} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-bold text-white">
+                        {m.name}
+                      </span>
+                      <span className="block truncate text-[11px] text-[var(--color-ink-muted)]">
+                        {DISCIPLINE_LABEL[m.discipline]}
+                        {m.disciplineLead && t(" · discipline lead", " · מנהל דיסציפלינה")}
+                        {m.external &&
+                          (lang === "he" ? (
+                            <>
+                              {" · אורח"}
+                              {m.hospital && (
+                                <>
+                                  {" מ־"}
+                                  <En>{m.hospital}</En>
+                                </>
+                              )}
+                            </>
+                          ) : (
+                            ` · visiting${m.hospital ? ` from ${m.hospital}` : ""}`
+                          ))}
+                      </span>
+                    </span>
+                    {active && (
+                      <Icon name="check_circle" size={19} className="text-[var(--color-primary)]" />
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
 
-          <div className="mt-4 w-full rounded-xl border border-[#f59e0b55] bg-[var(--color-warn-soft)] p-4 text-start">
-            <div className="mb-1.5 flex items-center gap-2">
-              <Icon name="science" size={18} className="text-[#fcd34d]" />
-              <h2 className="text-sm font-bold text-[#fcd34d]">
-                {t("Research demonstration build", "גרסת הדגמה למחקר")}
-              </h2>
-            </div>
-            <p className="text-[12px] leading-relaxed text-[#fcd34d]/90">
-              {t(
-                "Every patient, result and message here is fabricated. The system is not connected to any hospital record and is not intended for clinical decisions.",
-                "כל מטופל, כל תוצאה וכל הודעה כאן הם בדויים. המערכת אינה מחוברת לשום רשומה של בית החולים ואינה מיועדת לקבלת החלטות קליניות.",
-              )}
-            </p>
-          </div>
+          <Button icon="login" className="mt-4 w-full" onClick={enter}>
+            {t("Sign in", "כניסה")}
+          </Button>
         </div>
 
-        <div className="mt-8 space-y-3">
-          <Link
-            href="/login"
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] text-[15px] font-bold text-white transition-colors hover:bg-[var(--color-primary-hover)]"
-          >
-            <Icon name="fingerprint" size={22} />
-            {t("Verify identity and sign in", "אימות זהות וכניסה")}
-          </Link>
-          <p className="text-center text-[11px] text-[var(--color-ink-faint)]">
-            {lang === "he" ? (
-              <>
-                <En>{EDITION.stage}</En> <En>{EDITION.version}</En> · מהדורת{" "}
-                <En>{EDITION.edition}</En> · {EDITION.department.he} ·{" "}
-                {EDITION.site.he} · נתונים סינתטיים בלבד
-              </>
-            ) : (
-              <>
-                <En>
-                  {EDITION.stage} {EDITION.version}
-                </En>{" "}
-                · <En>{EDITION.edition}</En> edition · {EDITION.department.en} ·{" "}
-                {EDITION.site.en} · synthetic data only
-              </>
+        <div className="mt-6 space-y-3 text-center">
+          {/* Said plainly on purpose. This build checks nothing, and a screen
+              that implies otherwise would be the dishonest part. */}
+          <p className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] px-3 py-1.5 text-[11px] text-[var(--color-ink-muted)]">
+            <Icon name="lock" size={13} />
+            {t(
+              "No password is asked for, and none would be checked",
+              "לא מבקשים כאן סיסמה, ואף סיסמה לא הייתה נבדקת",
+            )}
+          </p>
+          <p className="text-[13px] text-[var(--color-ink-muted)]">
+            {t("Not on the list?", "לא ברשימה?")}{" "}
+            <Link href="/register" className="font-semibold text-[var(--color-primary)]">
+              {t("Request access", "בקשת גישה")}
+            </Link>
+          </p>
+          <p className="text-[11px] leading-relaxed text-[var(--color-ink-faint)]">
+            {t(
+              "From an organizational address at an Israeli health fund or hospital only.",
+              "רק מכתובת ארגונית של קופת חולים או בית חולים בישראל.",
             )}
           </p>
         </div>
